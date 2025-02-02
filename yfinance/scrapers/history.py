@@ -1304,7 +1304,7 @@ class PriceHistory:
 
         if df is None or df.empty:
             return df
-        if interval != '1d':
+        if interval in ['1wk', '1mo', '3mo', '1y']:
             return df
 
         logger = utils.get_yf_logger()
@@ -1754,7 +1754,7 @@ class PriceHistory:
             lookahead_idx = bisect.bisect_left(df2.index, lookahead_date)
             lookahead_idx = min(lookahead_idx, len(df2)-1)
             # In rare cases, the price dropped 1 day before dividend (DVD.OL @ 2024-05-15)
-            lookback_idx = div_idx-2 if div_idx > 1 else div_idx-1
+            lookback_idx = max(0, div_idx-14)
             # Check for bad stock splits in the lookahead period - 
             # if present, reduce lookahead to before.
             future_changes = df2['Close'].iloc[div_idx:lookahead_idx+1].pct_change()
@@ -1776,8 +1776,6 @@ class PriceHistory:
                 adjDeltas = x['Adj Low'].iloc[1:].to_numpy() - x['Adj Close'].iloc[:-1].to_numpy()
                 adjDeltas = np.append([0.0], adjDeltas)
                 x['adjDelta'] = adjDeltas
-                for i in np.where(x['Dividends']>0)[0]:
-                    x.loc[x.index[i], 'adjDelta'] += x['Dividends'].iloc[i]*x['Adj'].iloc[i]
                 deltas = x[['delta', 'adjDelta']]
                 if div_pct > 0.05 and div_pct < 1.0:
                     adjDiv = div * x['Adj'].iloc[0]
@@ -1912,7 +1910,7 @@ class PriceHistory:
                 pct_fail = n_fail / n
                 if c == 'div_too_big':
                     true_threshold = 1.0
-                    fals_threshold = 0.2
+                    fals_threshold = 0.25
 
                     if 'div_date_wrong' in cluster.columns and (cluster[c] == cluster['div_date_wrong']).all():
                         continue
@@ -2482,14 +2480,14 @@ class PriceHistory:
 
         r = _1d_change_x / split_rcp
         f_down = _1d_change_x < 1.0 / threshold
-        if f_down.any():
-            # Discard where triggered by negative Adj Close after dividend
-            f_neg = _1d_change_x < 0.0
-            f_div = (df2['Dividends']>0).to_numpy()
-            f_div_before = np.roll(f_div, 1)
-            if f_down.ndim == 2:
-                f_div_before = f_div_before[:, np.newaxis].repeat(f_down.shape[1], axis=1)
-            f_down = f_down & ~(f_neg + f_div_before)
+        # if f_down.any():
+        #     # Discard where triggered by negative Adj Close after dividend
+        #     f_neg = _1d_change_x < 0.0
+        #     f_div = (df2['Dividends']>0).to_numpy()
+        #     f_div_before = np.roll(f_div, 1)
+        #     if f_down.ndim == 2:
+        #         f_div_before = f_div_before[:, np.newaxis].repeat(f_down.shape[1], axis=1)
+        #     f_down = f_down & ~(f_neg + f_div_before)
         f_up = _1d_change_x > threshold
         f_up_ndims = len(f_up.shape)
         f_up_shifts = f_up if f_up_ndims==1 else f_up.any(axis=1)
@@ -2512,7 +2510,7 @@ class PriceHistory:
                         # assume false positive
                         continue
                     avg_vol_after = df2['Volume'].iloc[lookback:i-1].mean()
-                    if not np.isnan(avg_vol_after) and v/avg_vol_after < 2.0:
+                    if not np.isnan(avg_vol_after) and avg_vol_after > 0 and v/avg_vol_after < 2.0:
                         # volume spike is actually a step-change, so 
                         # probably missing stock split
                         continue
