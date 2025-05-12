@@ -28,17 +28,18 @@ from typing import Union
 
 import multitasking as _multitasking
 import pandas as _pd
+from curl_cffi import requests
 
 from . import Ticker, utils
 from .data import YfData
 from . import shared
-
+from .const import _SENTINEL_
 
 @utils.log_indent_decorator
 def download(tickers, start=None, end=None, actions=False, threads=True,
-             ignore_tz=None, group_by='column', auto_adjust=True, back_adjust=False,
+             ignore_tz=None, group_by='column', auto_adjust=None, back_adjust=False,
              repair=False, keepna=False, progress=True, period="max", interval="1d",
-             prepost=False, proxy=None, rounding=False, timeout=10, session=None,
+             prepost=False, proxy=_SENTINEL_, rounding=False, timeout=10, session=None,
              multi_level_index=True) -> Union[_pd.DataFrame, None]:
     """
     Download yahoo tickers
@@ -79,8 +80,6 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
         ignore_tz: bool
             When combining from different timezones, ignore that part of datetime.
             Default depends on interval. Intraday = False. Day+ = True.
-        proxy: str
-            Optional. Proxy server URL scheme. Default is None
         rounding: bool
             Optional. Round values to 2 decimal places?
         timeout: None or float
@@ -92,6 +91,12 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
             Optional. Always return a MultiIndex DataFrame? Default is True
     """
     logger = utils.get_yf_logger()
+    session = session or requests.Session(impersonate="chrome")
+
+    if auto_adjust is None:
+        # Warn users that default has changed to True
+        utils.print_once("YF.download() has changed argument auto_adjust default to True")
+        auto_adjust = True
 
     if logger.isEnabledFor(logging.DEBUG):
         if threads:
@@ -106,7 +111,7 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
 
     if ignore_tz is None:
         # Set default value depending on interval
-        if interval[1:] in ['m', 'h']:
+        if interval[-1] in ['m', 'h']:
             # Intraday
             ignore_tz = False
         else:
@@ -122,7 +127,7 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
     for ticker in tickers:
         if utils.is_isin(ticker):
             isin = ticker
-            ticker = utils.get_ticker_by_isin(ticker, proxy, session=session)
+            ticker = utils.get_ticker_by_isin(ticker, session=session)
             shared._ISINS[ticker] = isin
         _tickers_.append(ticker)
 
@@ -139,7 +144,11 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
     shared._TRACEBACKS = {}
 
     # Ensure data initialised with session.
-    YfData(session=session)
+    if proxy is not _SENTINEL_:
+        utils.print_once("YF deprecation warning: set proxy via new config function: yf.set_config(proxy=proxy)")
+        YfData(session=session, proxy=proxy)
+    else:
+        YfData(session=session)
 
     # download using threads
     if threads:
@@ -151,7 +160,7 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
                                    start=start, end=end, prepost=prepost,
                                    actions=actions, auto_adjust=auto_adjust,
                                    back_adjust=back_adjust, repair=repair, keepna=keepna,
-                                   progress=(progress and i > 0), proxy=proxy,
+                                   progress=(progress and i > 0),
                                    rounding=rounding, timeout=timeout)
         while len(shared._DFS) < len(tickers):
             _time.sleep(0.01)
@@ -162,7 +171,6 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
                                  start=start, end=end, prepost=prepost,
                                  actions=actions, auto_adjust=auto_adjust,
                                  back_adjust=back_adjust, repair=repair, keepna=keepna,
-                                 proxy=proxy,
                                  rounding=rounding, timeout=timeout)
             if progress:
                 shared._PROGRESS_BAR.animate()
@@ -180,7 +188,7 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
         errors = {}
         for ticker in shared._ERRORS:
             err = shared._ERRORS[ticker]
-            err = err.replace(f'{ticker}', '%ticker%')
+            err = err.replace(f'${ticker}: ', '')
             if err not in errors:
                 errors[err] = [ticker]
             else:
@@ -192,7 +200,7 @@ def download(tickers, start=None, end=None, actions=False, threads=True,
         tbs = {}
         for ticker in shared._TRACEBACKS:
             tb = shared._TRACEBACKS[ticker]
-            tb = tb.replace(f'{ticker}', '%ticker%')
+            tb = tb.replace(f'${ticker}: ', '')
             if tb not in tbs:
                 tbs[tb] = [ticker]
             else:
@@ -253,10 +261,10 @@ def _realign_dfs():
 def _download_one_threaded(ticker, start=None, end=None,
                            auto_adjust=False, back_adjust=False, repair=False,
                            actions=False, progress=True, period="max",
-                           interval="1d", prepost=False, proxy=None,
+                           interval="1d", prepost=False,
                            keepna=False, rounding=False, timeout=10):
     _download_one(ticker, start, end, auto_adjust, back_adjust, repair,
-                         actions, period, interval, prepost, proxy, rounding,
+                         actions, period, interval, prepost, rounding,
                          keepna, timeout)
     if progress:
         shared._PROGRESS_BAR.animate()
@@ -265,7 +273,7 @@ def _download_one_threaded(ticker, start=None, end=None,
 def _download_one(ticker, start=None, end=None,
                   auto_adjust=False, back_adjust=False, repair=False,
                   actions=False, period="max", interval="1d",
-                  prepost=False, proxy=None, rounding=False,
+                  prepost=False, rounding=False,
                   keepna=False, timeout=10):
     data = None
     try:
@@ -273,7 +281,7 @@ def _download_one(ticker, start=None, end=None,
                 period=period, interval=interval,
                 start=start, end=end, prepost=prepost,
                 actions=actions, auto_adjust=auto_adjust,
-                back_adjust=back_adjust, repair=repair, proxy=proxy,
+                back_adjust=back_adjust, repair=repair,
                 rounding=rounding, keepna=keepna, timeout=timeout,
                 raise_errors=True
         )

@@ -1,6 +1,78 @@
 Change Log
 ===========
 
+0.2.61
+------
+Fix ALL type hints in websocket #2493
+
+0.2.60
+------
+Fix cookie reuse, and handle DNS blocking fc.yahoo.com #2483
+Fixes for websocket:
+- relax protobuf version #2485
+- increase websockets version #2485
+- fix type hints #2488
+Fix predefined screen offset #2440
+
+0.2.59
+------
+Fix the fix for rate-limit #2452
+Feature: live price data websocket #2201
+
+0.2.58
+------
+Fix false rate-limit problem #2430
+Fix predefined screen size/count #2425
+
+0.2.57
+------
+Fix proxy msg & pass-thru #2418
+
+0.2.56
+------
+Features:
+- Ticker lookups #2364
+- Config #2391
+Fixes:
+- converting end epoch to localized dt #2378
+- info IndexError #2382
+- AttributeError: module 'requests.cookies' has no attribute 'update' #2388
+- fix_Yahoo_returning_live_separate() #2389
+
+0.2.55
+------
+Features
+- TTM financials #2321
+Fixes
+- info IndexError #2354
+- earnings dates TZ #2366
+- price repair tweaks & fixes #2368
+- history caching #2345
+- backup fetch TZ from info #2369
+Maintenance
+- log user agent #2326
+
+0.2.54
+------
+Hotfix user-agent #2277
+
+0.2.53
+------
+Fixes:
+- Fix: Failed to parse holders JSON data  #2234
+- Fix: Bad data in Holders #2244
+- Stop CSRF-cookie-fetch fail killing yfinance #2249
+- Fix Market Docs #2250
+- Fix: Broken "See also" links in documentation #2253
+- Fix: Interval check and error message formatting in multi.py #2256
+Improve:
+- Add pre- / post-stock prices (and other useful information) #2212
+- Warn user when use download() without specifying auto_adjust #2230
+- Refactor: Earnings Dates – Switch to API Fetching #2247
+- Improve prices div repair #2260
+Maintenance:
+- Add GitHub Actions workflow and fix failing tests #2233
+
 0.2.52
 ------
 Features:

@@ -61,13 +61,19 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests', 'examples']),
     install_requires=['pandas>=1.3.0', 'numpy>=1.16.5',
                       'requests>=2.31', 'multitasking>=0.0.7',
-                      'lxml>=4.9.1', 'platformdirs>=2.0.0', 'pytz>=2022.5',
+                      'platformdirs>=2.0.0', 'pytz>=2022.5',
                       'frozendict>=2.3.4', 'peewee>=3.16.2',
-                      'beautifulsoup4>=4.11.1', 'html5lib>=1.1'],
+                      'beautifulsoup4>=4.11.1', 'curl_cffi>=0.7',
+                      'protobuf>=3.19.0', 'websockets>=13.0'],
     extras_require={
         'nospam': ['requests_cache>=1.0', 'requests_ratelimiter>=0.3.1'],
         'repair': ['scipy>=1.6.3'],
     },
+    # Include protobuf files for websocket support
+    package_data={
+        'yfinance': ['pricing.proto', 'pricing_pb2.py'],
+    },
+    include_package_data=True,
     # Note: Pandas.read_html() needs html5lib & beautifulsoup4
     entry_points={
         'console_scripts': [

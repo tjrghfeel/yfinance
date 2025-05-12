@@ -2,24 +2,27 @@ import datetime as dt
 
 from ..data import YfData
 from ..data import utils
-from ..const import _QUERY1_URL_
+from ..const import _QUERY1_URL_, _SENTINEL_
 import json as _json
 
-class Market():
-    def __init__(self, market:'str',  session=None, proxy=None, timeout=30):
+class Market:
+    def __init__(self, market:'str', session=None, proxy=_SENTINEL_, timeout=30):
         self.market = market
         self.session = session
-        self.proxy = proxy
         self.timeout = timeout
 
         self._data = YfData(session=self.session)
+        if proxy is not _SENTINEL_:
+            utils.print_once("YF deprecation warning: set proxy via new config function: yf.set_config(proxy=proxy)")
+            self._data._set_proxy(proxy)
+
         self._logger = utils.get_yf_logger()
         
         self._status = None
         self._summary = None
 
     def _fetch_json(self, url, params):
-        data = self._data.cache_get(url=url, params=params, proxy=self.proxy, timeout=self.timeout)
+        data = self._data.cache_get(url=url, params=params, timeout=self.timeout)
         if data is None or "Will be right back" in data.text:
             raise RuntimeError("*** YAHOO! FINANCE IS CURRENTLY DOWN! ***\n"
                                "Our engineers are working quickly to resolve "
@@ -52,7 +55,7 @@ class Market():
         status_params = {
             "formatted": True,
             "key": "finance",
-            "lang": "en-GB",
+            "lang": "en-US",
             "market": self.market
         }
 
@@ -73,11 +76,11 @@ class Market():
             self._status['timezone'] = self._status['timezone'][0]
             del self._status['time']  # redundant
             try:
-                self._status.update(
-                    open  = dt.datetime.fromisoformat(self._status["open"]),
-                    close = dt.datetime.fromisoformat(self._status["close"]),
-                    tz = dt.timezone(self._status["timezone"]["gmtoffset"], self._status["timezone"]["short"])
-                )
+                self._status.update({
+                    "open": dt.datetime.fromisoformat(self._status["open"]),
+                    "close": dt.datetime.fromisoformat(self._status["close"]),
+                    "tz": dt.timezone(dt.timedelta(hours=int(self._status["timezone"]["gmtoffset"]))/1000, self._status["timezone"]["short"])
+                })
             except Exception as e:
                 self._logger.error(f"{self.market}: Failed to update market status")
                 self._logger.debug(f"{type(e)}: {e}")
